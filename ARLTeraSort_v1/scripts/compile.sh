@@ -1,0 +1,2 @@
+sbt clean
+sbt package

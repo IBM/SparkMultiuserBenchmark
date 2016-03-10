@@ -23,9 +23,6 @@ PERFDIR=/perf_test/perf_data
 FILENAME=$PERFDIR/single-stream-results_$CURRENTTIME$STEP_ID.txt
 JOBLOG=$PERFDIR/single-stream-$STEP_ID-job.log
 
-#changes made
-OUTPUT=/opt/Output/output-20000000-records-40-parts
-
 #fetch timestamp
 TIMESTAMP_FILE=/tmp/timestamp.run
 TIMESTAMP=$(cat $TIMESTAMP_FILE)
@@ -42,7 +39,7 @@ while [ $COUNTER -lt $NUMSORT ]; do
     #echo "$TIMESTAMP.$STEP_ID $COUNTER `date +%s`" | nc $MASTER_NAME 2003
     #echo "$TIMESTAMP.$STEP_ID.$COUNTER 1 `date +%s`" | nc $MASTER_NAME 2003
     echo "timing.$TIMESTAMP.$STEP_ID.$COUNTER 1 `date +%s`" | nc $MASTER_NAME 2003
-    /perf_test/perf_utilities/clean_sort_output.sh $OUTPUT${COUNTER}_$STEP_ID
+    #/perf_test/perf_utilities/clean_sort_output.sh $OUTPUTDIR${COUNTER}_$STEP_ID
     let COUNTER=COUNTER+1
     sleep 1
 done

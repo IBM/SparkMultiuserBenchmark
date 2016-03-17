@@ -1,0 +1,437 @@
+============================================
+Spark Performance Benchmark Audit Procedures
+============================================
+
+This document provides procedures to run the SMB benchmark using either the
+Apache Yarn, Apache Mesos or IBM Platform Conductor resource managers.
+
+These procedures assume the following, but your setup may vary:
+
+  * You have installed, configured and tested the system under test
+  * The master and worker nodes run on a cluster of 11 servers named 
+    "myserver1" to "myserver11"
+  * The server "myserver1" is the master node
+  * The server "myserver10" is exporting a drive through nfs for 
+    storing spark event logs.
+  * The master server mounts the nfs directory as /mnt/nfs/
+  * All components are installed in /opt
+      - Hadoop/Yarn: /opt/hadoop
+      - Spark: /opt/spark-1.5.2-bin-hadoop2.6
+      - Mesos: /opt/mesos-0.26.0
+  * Spark terasort data is available in HDFS at: /SparkBench/Terasort
+  * The test harness scripts are installed in /perf_test
+  * Ports used in this document are an example.
+      - Setup your ports according to your environment.
+
+
+
+
+The following steps are taken between every test run:
+
+------------------
+REBOOT all nodes:
+------------------
+
+[ ] 1. Reboot all the servers in the cluster (from
+
+    # for i in `seq 2 11`; do echo server$i; ssh server$i reboot; done
+
+    (from server1) 
+    # reboot
+
+
+-------------
+After REBOOT:
+-------------
+
+[ ] 1. Check to make sure that all hosts are up
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i uptime; done
+
+    Note: Best practice is to ensure your servers will reboot cleanly and without 
+          manual intervention.
+
+
+[ ] 2. Make sure that the NFS server up and running and is mounted by all servers.
+
+    # ssh server10 service nfs status
+
+    You should see a line indicating the NFS server is active on server10 like this:
+
+        "Active: active (exited) since Fri 2016-02-26 12:43:26 EST; 29s ago"
+
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i mount /mnt/nfs/; done
+    # for i in `seq 1 11`; do echo server$i; ssh server$i ls -l /mnt/nfs/; done
+   
+    You should see the nfs mounted drives available on all servers.
+        
+        
+[ ] 3. Syncronize clocks
+
+    The main purpose of this step is to make it easier to compare log files across servers.
+    This step assumes the SUT servers are not using ntpd:
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i ntpdate us.pool.ntp.org; done
+
+    Verify all server dates are sync'd:
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i date; done
+
+        
+[ ] 4. Start up Hadoop HDFS.
+
+    Log in to server1 as root and run the profile for the SUT you are testing. Invoke
+    one of the following:
+
+    # source /opt/profile.yarn-spark-bench
+    # source /opt/profile.mesos-spark-bench
+    # source /opt/profile.conductor-spark-bench
+    
+    Start HDFS:
+
+    # /opt/hadoop/sbin/stop-dfs.sh
+    # /opt/hadoop/sbin/start-dfs.sh
+
+    Verify HDFS is up by running jps on each host:
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i jps ; done | egrep "DataNode|NameNode|Secondary"
+
+    Verify the components are running:
+
+            server1: NameNode,SecondaryNameNode
+            all other servers: DataNode
+
+    Verify also by listing the HDFS directories and making sure they are accessible:
+
+    # hadoop fs -ls /SparkBench/Terasort
+   
+
+
+============================================================
+Configuring and running job for particular RESOURCE Manager:
+============================================================
+
+Follow the procedure for the particular resource manager you are testing.
+
+-----------------------------------------------
+Platform CONDUCTOR for Spark v1.1 (Spark 1.5.2)
+-----------------------------------------------
+
+
+[ ] 1. Restart Conductor:
+
+    # source /opt/profile.conductor-spark-bench
+        
+    Start the EGO services       
+    # egosh ego start all
+
+    Wait a couple minutes for everything to get started.
+        
+        
+[ ] 2. Verify Conductor has started up.
+
+    # egosh user logon -u Admin -x Admin
+
+    # egosh service list -l | egrep "SparkBenchmark-sparkms|SparkBenchmark-sparkhs|SparkBenchmark-sparkss"
+
+    This should show the following: 
+        * (1) 'started' for SparkBenchmark-sparkms <the process the spark-submit is connecting to>
+        * (1) 'started' for SparkBenchmark-sparkhs
+        * (10) 'started' SparkBenchmark-sparkss 
+
+    Wait for STATE to turn to STARTED for each of these... takes a few minutes.
+
+    Also check that entries after the SparkBenchmark-sparkss entry has 10 entries that all show as "RUN"
+
+        E.g. server2      1   4  RUN   924588
+             server3      1   4  RUN   924588
+             ...
+
+[ ] 3. Start the test run for Conductor.
+
+    # su - lsfadmin
+    # bash
+    # source /opt/profile.conductor-spark-bench
+    # cd /perf_test/perf_harness
+
+    Command line options:
+
+        nohup ./step_up_multi_user.sh <steps> <offset> <iterations> spark://server1:7100 > /perf_test/perf_data/env_output.log 2>&1 &
+        Where:
+           steps: the number of users
+           offset: delay in seconds before next user starts submission
+           iterations: number of jobs submitted for each user
+
+        Example with 30 users, 60s delay, 60 jobs submitted by each user:
+        nohup ./step_up_multi_user.sh 30 60 60 spark://server1:7100 > /perf_test/perf_data/env_output.log 2>&1 &
+
+    Run a SHORT WARMUP RUN of 2-30-5 before 30-60-60:
+
+    # nohup ./step_up_multi_user.sh 2 30 5 spark://server1:7100 > /perf_test/perf_data/env_output.log 2>&1 &
+
+    Note - it may take a couple minutes for nmon to start when doing this after a reboot. This test should 
+    take a few minutes. After the test completes, verify all jobs ran successfully:
+
+    # grep JobSucceeded /mnt/nfs/conductor/spark-events/* | wc -l
+
+    There should be 20 "JobSucceded" instances (2 times the num jobs submitted)
+          
+
+    Do Cleanup. **Open new shell that is root and invoke the following cleanup as root:
+
+    # /perf_test/perf_harness/clean_files_and_dirs.sh
+    # for i in `seq 1 11`; do echo server$i; ssh server$i "echo 3 > /proc/sys/vm/drop_caches"; done
+
+
+    Now make a FULL RUN. **Go back to shell that is 'lsfadmin'.
+
+    # nohup ./step_up_multi_user.sh 30 60 60 spark://server1:7100 > /perf_test/perf_data/env_output.log 2>&1 &
+
+    Monitor the progress and wait for the tests to complete. This will take upwards of 1.5 hrs.
+
+
+[ ] 4. Verify all jobs completed successfully.
+
+    # grep JobSucceeded /mnt/nfs/conductor/spark-events/* | wc -l
+
+    You should get "3600". *** If you don't, something went wrong; investigate.
+
+
+[ ] 5. Verify that all required data was collected in data directory.
+
+[ ] 6. Do a full cleanup
+
+    # cd /perf_test/perf_harness
+    # /perf_test/perf_harness/clean_files_and_dirs.sh
+
+
+
+---------------------------------------------- 
+Apache Hadoop Yarn v2.6 (Spark 1.5.2)
+-----------------------------------------------
+    
+[ ] 1. Start Yarn:
+
+    You should be logged in as root.
+
+    # source /opt/profile.yarn-spark-bench
+    # /opt/hadoop/sbin/stop-yarn.sh
+    # /opt/hadoop/sbin/start-yarn.sh
+
+    Wait a couple minutes for everything to get started.
+        
+[ ] 2. Verify services have started:
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i jps ; done
+
+    Make sure the following processes show up:
+
+            server1: ResourceManager
+            all other hosts: NodeManager
+            
+[ ] 3. Start history server for Yarn.
+
+    # /opt/spark-1.5.2-bin-hadoop2.6/sbin/start-history-server.sh /mnt/nfs/yarn/spark-events
+
+    To access the history server:
+        Open web browser to http://server1:28082
+        
+[ ] 4 Verify that shuffle service is running
+
+    The shuffle is part of the node manager; configured in spark-default.conf to have a particular 
+    port for shuffle service.  Look at that port on "lsof -i :9337" and make sure that shuffle 
+    service process is listening to the port
+
+       # for i in `seq 1 11`; do echo server$i; ssh server$i lsof -i :9337 ; done
+ 
+[ ] 5. Start the test run for Yarn.
+
+    # su - lsfadmin
+    # bash
+    # source /opt/profile.yarn-spark-bench
+    # cd /perf_test/perf_harness
+
+    Command line options:
+         nohup ./step_up_multi_user.sh <steps> <offset> <iterations> yarn-client > /perf_test/perf_data/env_output.log 2>&1 &
+
+         Where:
+            steps: the number of users
+            offset: delay in seconds before next user starts submission
+            iterations: number of jobs submitted for each user
+
+         Example with 30 users, 60s delay, 60 jobs submitted by each user:
+         nohup ./step_up_multi_user.sh 30 60 60 yarn-client > /perf_test/perf_data/env_output.log 2>&1 &
+
+
+    Run a SHORT WARMUP RUN of 2-30-5 before 30-60-60:
+       
+    # nohup ./step_up_multi_user.sh 2 30 5 yarn-client > /perf_test/perf_data/env_output.log 2>&1 &
+
+    Note - it may take a couple minutes for nmon to start when doing this after a reboot. This test should 
+    take a few minutes. After the test completes, verify all jobs ran successfully:
+          
+    # grep JobSucceeded /mnt/nfs/yarn/spark-events/* | wc -l
+          
+    There should be 20 "JobSucceded" instances (2 times the num jobs submitted)
+ 
+
+    Do Cleanup.
+
+    # /perf_test/perf_harness/clean_files_and_dirs.sh
+    # for i in `seq 1 11`; do echo server$i; ssh server$i "echo 3 > /proc/sys/vm/drop_caches"; done
+
+
+    Now make a FULL RUN.
+
+    # cd /perf_test/perf_harness
+    # nohup ./step_up_multi_user.sh 30 60 60 yarn-client > /perf_test/perf_data/env_output.log 2>&1 &
+
+
+[ ] 6. Verify all jobs completed successfully.
+
+    # grep JobSucceeded /mnt/nfs/yarn/spark-events/* | wc -l
+
+    You should get "3600". *** If you don't, something went wrong; investigate.
+
+
+[ ] 7. Verify that all required data was collected in data directory.
+
+
+[ ] 8. Do a full cleanup
+
+    # /perf_test/perf_harness/clean_files_and_dirs.sh
+
+
+
+-----------------------------------------------
+Apache MESOS v0.26.0 (Spark 1.5.2)
+-----------------------------------------------
+
+[ ] 1. Restart Mesos:
+
+    # source /opt/profile.mesos-spark-bench
+    # cd /opt/mesos-0.26.0/scripts/
+    # ./stop_slaves.sh
+    # ./stop_master.sh
+    # ./start_master.sh
+    # ./start_slaves.sh 
+        
+     
+[ ] 2. Start history any running history for server.
+    # ps -ef|grep history
+    # kill -9 <pid>
+ 
+
+[ ] 3. Start history server for Mesos.
+
+    # /opt/spark-1.5.2-bin-hadoop2.6/sbin/start-history-server.sh /mnt/nfs/mesos/spark-events
+
+    To access the history server:
+       Open web browser to http://server1:32080
+
+
+[ ] 4. Verify Mesos services have started:
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i "ps -ef|grep lt-mesos" ; done
+
+    Check for lt-mesos-slave and lt-mesos-master
+
+    # for i in `seq 1 11`; do echo server$i; ssh server$i "ps -ef|grep MesosExternalShuffleService" ; done
+           
+    Verify that a slave started on each of the 10 worker nodes and that master started on server1 
+
+
+[ ] 5. Start the test run for Mesos.
+
+    You should be logged in as root.
+
+    # source /opt/profile.mesos-spark-bench
+    # cd /perf_test/perf_harness
+
+    Command line options:
+         nohup ./step_up_multi_user.sh <steps> <offset> <iterations> mesos://server1:5050 > /perf_test/perf_data/env_output.log 2>&1 &
+
+         Where:
+            steps: the number of users
+            offset: delay in seconds before next user starts submission
+            iterations: number of jobs submitted for each user
+
+         Example with 30 users, 60s delay, 60 jobs submitted by each user:
+         nohup ./step_up_multi_user.sh 30 60 60 mesos://server1:5050 > /perf_test/perf_data/env_output.log 2>&1 &
+
+
+    Run a SHORT WARMUP RUN of 2-30-5 before 30-60-60:
+
+    # nohup ./step_up_multi_user.sh 2 30 5 mesos://server1:5050 > /perf_test/perf_data/env_output.log 2>&1 &
+
+    Note - it may take a couple minutes for nmon to start when doing this after a reboot. This test should 
+    take a few minutes. After the test completes, verify all jobs ran successfully:
+
+    # grep JobSucceeded /mnt/nfs/mesos/spark-events/* | wc -l
+         
+    There should be 20 "JobSucceded" instances (2 times the num jobs submitted)
+
+
+    Do Cleanup
+
+    # /perf_test/perf_harness/clean_files_and_dirs.sh
+    # for i in `seq 1 11`; do echo server$i; ssh server$i "echo 3 > /proc/sys/vm/drop_caches"; done
+
+
+    Now make a FULL RUN:
+
+    # cd /perf_test/perf_harness
+    # nohup ./step_up_multi_user.sh 30 60 60 mesos://server1:5050 > /perf_test/perf_data/env_output.log 2>&1 &
+
+
+[ ] 6. Verify all jobs completed successfully.
+
+    # grep JobSucceeded /mnt/nfs/mesos/spark-events/* | wc -l
+
+    You should get "3600". *** If you don't, something went wrong; investigate.
+
+
+[ ] 7. Verify that all required data was collected in data directory.
+
+
+[ ] 8. Do a full cleanup
+
+    # /perf_test/perf_harness/clean_files_and_dirs.sh
+        
+
+------------------------------------------
+Options to check STATUS of a current run
+------------------------------------------
+
+[ ] 1. Tailing one of the driver_output_<user>.log files.
+
+    # cd /perf_test/perf_data
+    # grep ERROR driver_output_*
+            - Find any errors messages:
+                For example, any "SparkUncaughtExceptionHandler" indicates a failed job due to akka configuration
+         
+[ ] 2. Check the number of directories created under HDFS output directory.
+        # hadoop fs -ls /SparkBench/Terasort/Output/ | wc -l
+            - There should be an output directory created for each Spark job submission.
+            - The number should reach <steps> x <iterations>
+            - Periodically running the command can give an estimate of the progress
+            
+[ ] 3. Check the number of files under spark-events directory (read by the history server).
+        # ls -l /mnt/nfs/yarn/spark-events/|wc -l
+        # ls -l /mnt/nfs/mesos/spark-events/|wc -l
+        # ls -l /mnt/nfs/conductor/spark-events/|wc -l
+            - There should always be a file for a successful job indicated by these lines:
+                {"Event":"SparkListenerJobEnd","Job ID":0,"Completion Time":1454090875632,"Job Result":{"Result":"JobSucceeded"}}
+                {"Event":"SparkListenerJobEnd","Job ID":1,"Completion Time":1454090888666,"Job Result":{"Result":"JobSucceeded"}}
+            - The total number of files should equal <steps> x <iterations>
+                - If there are less, this indicates there are failed jobs
+                    # grep "JobSucceeded" /mnt/nfs/conductor/spark-events/*|wc -l
+                        -There should be 3600 entries (2 jobs per application)
+                
+[ ] 4. Check for the executor memory size and cores:
+        # for i in `seq 1 11`; do echo server$i; ssh server$i "ps -ef|grep executor" ; done
+        
+[ ] 5. Monitor the master host server1 by running 'nmon' interactively in another window.
+
+

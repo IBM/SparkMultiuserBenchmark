@@ -1,0 +1,36 @@
+=============================
+Wed Mar 29 12:26:47 EDT 2017
+Queue Information : 
+Queue Name : BATCH
+	State : RUNNING
+	Capacity : 30.0%
+	Current Capacity : .0%
+	Maximum Capacity : 100.0%
+	Default Node Label expression : 
+	Accessible Node Labels : *
+Queue Information : 
+Queue Name : INTERACTIVE
+	State : RUNNING
+	Capacity : 70.0%
+	Current Capacity : .0%
+	Maximum Capacity : 70.0%
+	Default Node Label expression : 
+	Accessible Node Labels : *
+=============================
+Wed Mar 29 12:26:53 EDT 2017
+Queue Information : 
+Queue Name : BATCH
+	State : RUNNING
+	Capacity : 30.0%
+	Current Capacity : .0%
+	Maximum Capacity : 100.0%
+	Default Node Label expression : 
+	Accessible Node Labels : *
+Queue Information : 
+Queue Name : INTERACTIVE
+	State : RUNNING
+	Capacity : 70.0%
+	Current Capacity : .0%
+	Maximum Capacity : 70.0%
+	Default Node Label expression : 
+	Accessible Node Labels : *

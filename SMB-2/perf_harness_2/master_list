@@ -1,0 +1,6 @@
+#spark://red21:7077
+#yarn-client
+#mesos://red21:5050
+#mesos://red21:7077
+#mesos://red21
+#yarn

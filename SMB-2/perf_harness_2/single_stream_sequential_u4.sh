@@ -53,7 +53,7 @@ then
 
     $SPARK_HOME/bin/spark-submit --class com.ibm.platform.benchmarks.smb2.syncinteractive.UserQueryStream --master $MASTER_NAME --deploy-mode client --driver-memory 3g --queue INTERACTIVE --name UserQueryStream_$STREAMID_$CURRENTTIME UserQueryStream.jar $NUMSEQITER $QUERYDELAY $SEQDELAY $FILENAME $TPCDSPATH
 
-elif [ "$MASTER_NAME" = "mesos://red21:5050" ]
+elif [ "$MASTER_NAME" = "mesos://<YOUR_MESOS_HOST>:5050" ]
 then 
 
     echo "$SPARK_HOME/bin/spark-submit --class com.ibm.platform.benchmarks.smb2.syncinteractive.UserQueryStream --master $MASTER_NAME --deploy-mode client --driver-memory 3g --conf spark.mesos.role=INTERACTIVE --name UserQueryStream$Stream_$STREAMID_$CURRENTTIME UserQueryStream.jar $NUMSEQITER $QUERYDELAY $SEQDELAY $FILENAME $TPCDSPATH"

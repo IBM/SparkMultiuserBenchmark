@@ -17,7 +17,7 @@ BATCH_STREAM_OFFSET=60
 BATCH_NUM_SEQ_ITER=$2
 BATCH_QUERY_DELAY=30
 BATCH_SEQ_DELAY=120
-BATCH_TPCDS_DB_PATH="hdfs://red21:48020/user/root/tpcds_sfactor_24"
+BATCH_TPCDS_DB_PATH="hdfs://<YOUR_HDFS_HOST>:48020/user/root/tpcds_sfactor_24"
 
 # Workload delay
 WORKLOAD_DELAY=$3
@@ -28,7 +28,7 @@ INT_STREAM_OFFSET=60
 INT_NUM_SEQ_ITER=$5
 INT_QUERY_DELAY=1
 INT_SEQ_DELAY=5
-INT_TPCDS_DB_PATH="hdfs://red21:48020/user/root/tpcds_sfactor_12"
+INT_TPCDS_DB_PATH="hdfs://<YOUR_HDFS_HOST>:48020/user/root/tpcds_sfactor_12"
 
 
 #mkdir /tmp/spark-events

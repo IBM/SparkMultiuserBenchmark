@@ -55,7 +55,11 @@ cp SparkMultiuserBenchmark-master/SMB-2/perf_harness_2/* /perf_test/perf_harness
 9. If you are running use case 4, you need to edit /perf_test/perf_harness_2/master_list_u4_batch, and /perf_test/perf_harness_2/master_list_u4_inter to contain the URL of the spark master which will run that particular workload.
 10. Generate TPC-DS data with scale factor of your choosing. The TPC-DS kit has been included in this repository under the tpcdskit folder. Follow the readme located at https://github.com/cloudera/impala-tpcds-kit to generate your input data but use the package included in this repository. The TPC-DS kit from the Cloudera repository has outstanding defects which will prevent data generation.
 11. Source the profile you created.
-12. cd /perf_test/perf_harness_2/
+12. Copy the hive-site.xml file into your Spark deployment configuration directory. For example:
+```
+cp SparkMultiuserBenchmark-master/common/perf_utilities/hive-site.xml $SPARK_HOME/conf/
+```
+13. cd /perf_test/perf_harness_2/
 
 ## Running the benchmark
 ### Use case 1: Synchronus interactive multiuser 

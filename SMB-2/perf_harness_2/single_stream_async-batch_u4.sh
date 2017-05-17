@@ -102,7 +102,7 @@ do
 			echo "yarn cluster mode, need kill the spark-sbmit process, $PID_SPARK_SUBMIT, b/c  we don't want too many spark-submit process occupy memory"
  #                   	kill $PID_SPARK_SUBMIT
                 
-                elif [ "$MASTER_NAME" = "mesos://red21:7077" ]
+                elif [ "$MASTER_NAME" = "mesos://<YOUR_MESOS_HOST>:7077" ]
                 then
 
                         echo "$SPARK_HOME/bin/spark-submit --class com.ibm.platform.benchmarks.smb2.asyncbatch.AsyncBatchQueries --master $MASTER_NAME --deploy-mode cluster --driver-memory 3g --conf spark.mesos.role=BATCH --name UseAsyncQueryStream_$STREAMID_$CURRENTTIME AsyncBatchQueries.jar ${sequence[$r,$QUERYCOUNTER]} $TPCDSPATH $PERFDIR/ $STREAMID $SEQCOUNTER &"

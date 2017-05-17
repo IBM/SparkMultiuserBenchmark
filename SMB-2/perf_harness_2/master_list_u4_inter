@@ -1,10 +1,1 @@
-##spark://red21:7080
-#spark://red21:7078
-#yarn-client
-#yarn cluster mode
-yarn
-#mesos client mode
-#mesos://red21:5050
-#mesos cluster mode
-#mesos://red21:7077
-#mesos://red21
+#spark://<YOURSPARKMASTER>:7080
